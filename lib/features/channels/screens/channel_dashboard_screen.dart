@@ -30,20 +30,22 @@ class ChannelHeader extends StatelessWidget {
   }
 }
 
+import 'package:betwizz_app/app.dart'; // For AppRoutes
+
 // Placeholder for StartStreamButton widget
-class StartStreamButton extends StatelessWidget {
-  const StartStreamButton({super.key});
+// Renaming to reflect its new purpose or making it more generic
+class ManageChannelButton extends StatelessWidget { // Renamed for clarity
+  const ManageChannelButton({super.key});
 
   @override
   Widget build(BuildContext context) {
     return FloatingActionButton(
       onPressed: () {
-        // TODO: Implement start stream functionality
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Start Stream (Not Implemented)')),
-        );
+        // Navigate to Create Channel Screen
+        Navigator.pushNamed(context, AppRoutes.createChannel);
       },
-      child: const Icon(Icons.video_call),
+      tooltip: 'Create/Manage Channel', // Updated tooltip
+      child: const Icon(Icons.add_circle_outline), // Changed icon
     );
   }
 }
@@ -158,7 +160,7 @@ class _ChannelDashboardScreenState extends State<ChannelDashboardScreen> with Si
           ),
         ],
       ),
-      floatingActionButton: _isCreator ? const StartStreamButton() : null,
+      floatingActionButton: _isCreator ? const ManageChannelButton() : null, // Updated to use ManageChannelButton
     );
   }
 }

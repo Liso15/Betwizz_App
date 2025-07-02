@@ -1,19 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:betwizz_app/features/auth/screens/login_screen.dart';
 import 'package:betwizz_app/features/auth/screens/register_screen.dart';
 import 'package:betwizz_app/features/channels/screens/channel_dashboard_screen.dart';
+import 'package:betwizz_app/features/channels/screens/create_channel_screen.dart'; // Import CreateChannelScreen
 import 'package:betwizz_app/features/receipt_processing/screens/receipt_scan_screen.dart';
 import 'package:betwizz_app/features/ai/screens/ai_dashboard_screen.dart';
 import 'package:betwizz_app/core/theme/app_theme.dart';
-import 'package:betwizz_app/features/auth/notifiers/auth_notifier.dart'; // Import AuthNotifier
-import 'package:betwizz_app/features/auth/models/auth_state.dart'; // Import AuthState
+import 'package:betwizz_app/features/auth/notifiers/auth_notifier.dart';
+import 'package:betwizz_app/features/auth/models/auth_state.dart';
 
 // Define route names for easy access and to avoid typos
 class AppRoutes {
   static const String login = '/login';
   static const String register = '/register';
   static const String channelDashboard = '/channel-dashboard';
+  static const String createChannel = '/create-channel'; // Add createChannel route
   static const String receiptScan = '/receipt-scan';
   static const String aiDashboard = '/ai-dashboard';
   // Add other routes here
@@ -75,6 +77,7 @@ class BetwizzApp extends ConsumerWidget { // Changed to ConsumerWidget
         AppRoutes.login: (context) => const LoginScreen(),
         AppRoutes.register: (context) => const RegisterScreen(),
         AppRoutes.channelDashboard: (context) => const ChannelDashboardScreen(),
+        AppRoutes.createChannel: (context) => const CreateChannelScreen(), // Add route for CreateChannelScreen
         AppRoutes.receiptScan: (context) => const ReceiptScanScreen(),
         AppRoutes.aiDashboard: (context) => const AiDashboardScreen(),
       },
