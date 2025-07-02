@@ -163,6 +163,15 @@ class _ChannelDashboardScreenState extends State<ChannelDashboardScreen> with Si
     return Scaffold(
       appBar: AppBar(
         title: const Text('Channel Dashboard'),
+        actions: [ // Added actions to AppBar
+          IconButton(
+            icon: const Icon(Icons.video_library_outlined),
+            tooltip: 'Video Player Demo',
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.videoPlayerDemo);
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
