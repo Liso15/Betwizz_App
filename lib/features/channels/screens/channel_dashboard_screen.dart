@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:betwizz_app/features/channels/models/strategy_model.dart';
+import 'package:betwizz_app/features/channels/notifiers/strategy_providers.dart';
+import 'package:intl/intl.dart'; // For date formatting
 
 // Placeholder for Creator data model, replace with actual model later
 class Creator {
@@ -44,6 +48,60 @@ class StartStreamButton extends StatelessWidget {
   }
 }
 
+class StrategyVaultView extends ConsumerWidget {
+  const StrategyVaultView({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strategiesAsyncValue = ref.watch(strategiesProvider);
+
+    return strategiesAsyncValue.when(
+      data: (strategies) {
+        if (strategies.isEmpty) {
+          return const Center(child: Text('No strategies found.'));
+        }
+        return ListView.builder(
+          itemCount: strategies.length,
+          itemBuilder: (context, index) {
+            final strategy = strategies[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+              child: ListTile(
+                title: Text(strategy.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(strategy.description),
+                    const SizedBox(height: 4),
+                    Text(
+                      'By: ${strategy.authorName} - ${DateFormat.yMMMd().format(strategy.createdAt)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+                // isThreeLine: true, // If description is long
+                onTap: () {
+                  // TODO: Implement navigation to strategy detail screen or action
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Tapped on: ${strategy.title}')),
+                  );
+                },
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, stackTrace) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Text('Error loading strategies: $error', textAlign: TextAlign.center),
+        ),
+      ),
+    );
+  }
+}
+
 
 class ChannelDashboardScreen extends StatefulWidget {
   const ChannelDashboardScreen({super.key});
@@ -73,25 +131,9 @@ class _ChannelDashboardScreenState extends State<ChannelDashboardScreen> with Si
 
   @override
   Widget build(BuildContext context) {
-    // Pseudo-Widget Structure from PRD 3.1.1
-    // ChannelDashboard(
-    //   header: ChannelHeader(creator: _creator),
-    //   body: TabBarView(
-    //     tabs: [
-    //       Tab(icon: Icon(Icons.live_tv), // Live Stream
-    //       Tab(icon: Icon(Icons.library_books)), // Strategy Vault
-    //       Tab(icon: Icon(Icons.forum)), // Community Chat
-    //     ],
-    //   ),
-    //   floatingActionButton: _isCreator ? StartStreamButton() : null,
-    // )
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Channel Dashboard'),
-        // The PRD implies ChannelHeader might be part of the body,
-        // but an AppBar or a SliverAppBar is more conventional for headers.
-        // For now, placing a simplified header in AppBar's bottom for the tabs.
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -103,15 +145,13 @@ class _ChannelDashboardScreenState extends State<ChannelDashboardScreen> with Si
       ),
       body: Column(
         children: [
-          // ChannelHeader as per PRD structure (can be part of body)
           ChannelHeader(creator: _creator),
           Expanded(
             child: TabBarView(
               controller: _tabController,
               children: const [
-                // Placeholder content for each tab
-                Center(child: Text('Live Stream Tab Content (e.g., list of live channels or current stream)')),
-                Center(child: Text('Strategy Vault Tab Content')),
+                Center(child: Text('Live Stream Tab Content')),
+                StrategyVaultView(), // Use the new ConsumerWidget here
                 Center(child: Text('Community Chat Tab Content')),
               ],
             ),
