@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth; // aliased import
 import 'package:betwizz_app/features/auth/models/user_model.dart';
 
 // Abstract AuthService defining the contract
@@ -6,62 +7,92 @@ abstract class AuthService {
   Future<UserModel> signInWithEmailAndPassword(String email, String password);
   Future<UserModel> signUpWithEmailAndPassword(String email, String password);
   Future<void> signOut();
-  Stream<UserModel?> get authStateChanges; // To listen for auth state changes
+  Stream<UserModel?> get authStateChanges;
 }
 
-// Concrete implementation - Placeholder for Firebase Auth
+// Concrete implementation using Firebase Auth
 class FirebaseAuthService implements AuthService {
-  // Simulate a stream of user authentication state
-  // In a real app, this would wrap FirebaseAuth.instance.authStateChanges()
+  final fb_auth.FirebaseAuth _firebaseAuth;
+
+  // Constructor, allowing injection of FirebaseAuth instance for testability
+  FirebaseAuthService({fb_auth.FirebaseAuth? firebaseAuth})
+      : _firebaseAuth = firebaseAuth ?? fb_auth.FirebaseAuth.instance;
+
+  // Helper to convert Firebase User to our UserModel
+  UserModel? _userModelFromFirebase(fb_auth.User? firebaseUser) {
+    if (firebaseUser == null) {
+      return null;
+    }
+    return UserModel(
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      displayName: firebaseUser.displayName,
+    );
+  }
+
   @override
-  Stream<UserModel?> get authStateChanges async* {
-    // Initially, no user is logged in
-    yield null;
-    // In a real app, Firebase would emit events here. We simulate a login after some time for testing.
-    // For this placeholder, it will just yield null and won't simulate a login automatically.
-    // The AuthNotifier will handle the actual login simulation via signIn.
+  Stream<UserModel?> get authStateChanges {
+    return _firebaseAuth.authStateChanges().map(_userModelFromFirebase);
   }
 
   @override
   Future<UserModel?> getCurrentUser() async {
-    // Simulate checking for current user
-    await Future.delayed(const Duration(milliseconds: 300));
-    // Return null as we assume no user is logged in initially for the placeholder
-    return null;
-    // Or return a dummy user if you want to simulate an already logged-in state:
-    // return const UserModel(uid: 'dummyUID', email: 'test@example.com', displayName: 'Dummy User');
+    final firebaseUser = _firebaseAuth.currentUser;
+    return _userModelFromFirebase(firebaseUser);
   }
 
   @override
   Future<UserModel> signInWithEmailAndPassword(String email, String password) async {
-    await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
-    if (email == 'test@example.com' && password == 'password') {
-      return UserModel(uid: 'testUID123', email: email, displayName: 'Test User');
-    } else if (email == 'error@example.com') {
-      throw Exception('Simulated login error: Invalid credentials');
-    } else {
-      throw Exception('Invalid email or password');
+    try {
+      final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final firebaseUser = userCredential.user;
+      if (firebaseUser == null) {
+        // This case should ideally not happen if signInWithEmailAndPassword succeeds
+        throw Exception('Login failed: No user data received.');
+      }
+      return _userModelFromFirebase(firebaseUser)!; // Non-null assertion as firebaseUser is checked
+    } on fb_auth.FirebaseAuthException catch (e) {
+      // Handle specific Firebase Auth exceptions or rethrow a generic one
+      // Example: e.code could be 'user-not-found', 'wrong-password', etc.
+      throw Exception('Login failed: ${e.message} (Code: ${e.code})');
+    } catch (e) {
+      throw Exception('An unexpected error occurred during login: ${e.toString()}');
     }
   }
 
   @override
   Future<UserModel> signUpWithEmailAndPassword(String email, String password) async {
-    await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
-    if (email.contains('@') && password.length > 6) {
-      // In a real app, this would create a user in Firebase
-      return UserModel(uid: 'newUserUID456', email: email, displayName: 'New User');
-    } else if (email == 'exists@example.com') {
-      throw Exception('Simulated sign up error: Email already exists');
-    }
-    else {
-      throw Exception('Invalid email or password format for sign up');
+    try {
+      final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final firebaseUser = userCredential.user;
+      if (firebaseUser == null) {
+        throw Exception('Sign up failed: No user data received.');
+      }
+      // You might want to update the user's display name here if you collect it during sign up
+      // await firebaseUser.updateDisplayName('Some Name');
+      return _userModelFromFirebase(firebaseUser)!;
+    } on fb_auth.FirebaseAuthException catch (e) {
+      // Example: e.code could be 'email-already-in-use', 'weak-password', etc.
+      throw Exception('Sign up failed: ${e.message} (Code: ${e.code})');
+    } catch (e) {
+      throw Exception('An unexpected error occurred during sign up: ${e.toString()}');
     }
   }
 
   @override
   Future<void> signOut() async {
-    await Future.delayed(const Duration(milliseconds: 500)); // Simulate network delay
-    // In a real app, this would call FirebaseAuth.instance.signOut()
-    print('User signed out (simulated)');
+    try {
+      await _firebaseAuth.signOut();
+    } on fb_auth.FirebaseAuthException catch (e) {
+      throw Exception('Sign out failed: ${e.message} (Code: ${e.code})');
+    } catch (e) {
+      throw Exception('An unexpected error occurred during sign out: ${e.toString()}');
+    }
   }
 }
