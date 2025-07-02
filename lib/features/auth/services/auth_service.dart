@@ -1,5 +1,6 @@
-import 'package:firebase_auth/firebase_auth.dart' as fb_auth; // aliased import
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:betwizz_app/features/auth/models/user_model.dart';
+import 'package:betwizz_app/features/user_profile/services/user_db_service.dart'; // Import UserDbService
 
 // Abstract AuthService defining the contract
 abstract class AuthService {
@@ -13,10 +14,14 @@ abstract class AuthService {
 // Concrete implementation using Firebase Auth
 class FirebaseAuthService implements AuthService {
   final fb_auth.FirebaseAuth _firebaseAuth;
+  final UserDbService _userDbService; // Add UserDbService dependency
 
-  // Constructor, allowing injection of FirebaseAuth instance for testability
-  FirebaseAuthService({fb_auth.FirebaseAuth? firebaseAuth})
-      : _firebaseAuth = firebaseAuth ?? fb_auth.FirebaseAuth.instance;
+  // Constructor updated to accept UserDbService
+  FirebaseAuthService({
+    fb_auth.FirebaseAuth? firebaseAuth,
+    required UserDbService userDbService, // UserDbService is now required
+  })  : _firebaseAuth = firebaseAuth ?? fb_auth.FirebaseAuth.instance,
+        _userDbService = userDbService;
 
   // Helper to convert Firebase User to our UserModel
   UserModel? _userModelFromFirebase(fb_auth.User? firebaseUser) {
@@ -75,8 +80,31 @@ class FirebaseAuthService implements AuthService {
         throw Exception('Sign up failed: No user data received.');
       }
       // You might want to update the user's display name here if you collect it during sign up
-      // await firebaseUser.updateDisplayName('Some Name');
-      return _userModelFromFirebase(firebaseUser)!;
+      // For example, if a username is collected during registration:
+      // if (username != null && username.isNotEmpty) {
+      //   await firebaseUser.updateDisplayName(username);
+      // }
+      // Create UserModel from Firebase User
+      final userModel = _userModelFromFirebase(firebaseUser);
+      if (userModel == null) {
+        // Should not happen if firebaseUser is not null
+        throw Exception('Sign up succeeded but failed to map Firebase user.');
+      }
+
+      // Create user profile in Firestore
+      try {
+        await _userDbService.createUserProfile(userModel);
+      } catch (dbError) {
+        // Decide on error handling strategy:
+        // 1. Rethrow and let AuthNotifier handle it (user auth exists, but profile creation failed).
+        // 2. Delete the Firebase user and rethrow (more complex, makes signUp atomic).
+        // 3. Log error and proceed (user auth exists, profile can be created later).
+        // For now, rethrow, AuthNotifier will show a generic error.
+        // A more specific error message might be useful for the user.
+        throw Exception('Sign up successful, but failed to create user profile: ${dbError.toString()}');
+      }
+
+      return userModel;
     } on fb_auth.FirebaseAuthException catch (e) {
       // Example: e.code could be 'email-already-in-use', 'weak-password', etc.
       throw Exception('Sign up failed: ${e.message} (Code: ${e.code})');

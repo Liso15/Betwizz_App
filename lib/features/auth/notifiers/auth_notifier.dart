@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:betwizz_app/features/auth/models/auth_state.dart';
 import 'package:betwizz_app/features/auth/models/user_model.dart';
 import 'package:betwizz_app/features/auth/services/auth_service.dart';
+import 'package:betwizz_app/features/user_profile/services/user_db_service.dart'; // Import UserDbService provider
 
 // Provider for the AuthService implementation
 // This allows us to easily swap out the implementation if needed (e.g., for testing)
 final authServiceProvider = Provider<AuthService>((ref) {
-  return FirebaseAuthService(); // Using the placeholder implementation
+  // FirebaseAuthService now depends on UserDbService
+  final userDbService = ref.watch(userDbServiceProvider);
+  return FirebaseAuthService(userDbService: userDbService);
 });
 
 // The AuthNotifier using AsyncNotifier for managing asynchronous auth state

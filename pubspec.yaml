@@ -28,6 +28,9 @@ dependencies:
   # Firebase Auth - from PRD 1.2
   firebase_auth: ^5.0.0 # PRD specified 5.0, ensure compatibility
 
+  # Cloud Firestore
+  cloud_firestore: ^4.17.0 # For user profile storage & other DB needs
+
   # For ZAR formatting - from PRD 6.1
   intl: ^0.19.0 # For NumberFormat
 
