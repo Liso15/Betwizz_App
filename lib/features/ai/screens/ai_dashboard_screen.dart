@@ -1,30 +1,10 @@
 import 'package:flutter/material.dart';
-// import 'package:rive/rive.dart'; // For Rive animations
-// import 'package:custom_paint_example/custom_paint.dart'; // For CustomPaint examples
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Import Riverpod
+import 'package:betwizz_app/features/ai/widgets/mfethu_chat_bubble.dart';
+import 'package:betwizz_app/features/channels/models/chat_message_model.dart'; // Used by MfethuChatBubble & Notifier
+import 'package:betwizz_app/features/ai/notifiers/mfethu_chat_notifier.dart'; // Import the notifier
 
-// Placeholder for Mfethu Chat Bubble - PRD 7.1
-class MfethuChatBubble extends StatelessWidget {
-  final String text;
-  final bool isUser; // To differentiate user messages from Mfethu's
-
-  const MfethuChatBubble({super.key, required this.text, required this.isUser});
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-        margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        decoration: BoxDecoration(
-          color: isUser ? Colors.blue[100] : Colors.grey[300],
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(text),
-      ),
-    );
-  }
-}
+// MfethuChatBubble class has been moved
 
 // Placeholder for Khanyo Prediction Display - PRD 7.1
 class KhanyoPredictionCard extends StatelessWidget {
@@ -67,51 +47,71 @@ class KhanyoPredictionCard extends StatelessWidget {
   }
 }
 
-
-class AiDashboardScreen extends StatefulWidget {
+class AiDashboardScreen extends ConsumerStatefulWidget { // Changed to ConsumerStatefulWidget
   const AiDashboardScreen({super.key});
 
   @override
-  State<AiDashboardScreen> createState() => _AiDashboardScreenState();
+  ConsumerState<AiDashboardScreen> createState() => _AiDashboardScreenState();
 }
 
-class _AiDashboardScreenState extends State<AiDashboardScreen> {
+class _AiDashboardScreenState extends ConsumerState<AiDashboardScreen> { // Changed to ConsumerState
   final TextEditingController _chatController = TextEditingController();
-  final List<Map<String, dynamic>> _chatMessages = [
-    {'text': 'Welcome to Mfethu Chat! How can I help you with your betting strategy today?', 'isUser': false},
-    // PRD 4.2: Mfethu basic Q&A (local NLP model)
-    {'text': 'Remember, Mfethu can provide basic Q&A even offline.', 'isUser': false},
-  ];
+  final ScrollController _scrollController = ScrollController();
 
-  // Placeholder for Rive animation - PRD 7.1
-  // RiveAnimationController _riveController; (would need initialization)
+  @override
+  void dispose() {
+    _chatController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   void _sendMessage() {
-    if (_chatController.text.isNotEmpty) {
-      setState(() {
-        _chatMessages.add({'text': _chatController.text, 'isUser': true});
-        // Simulate Mfethu's response
-        _chatMessages.add({'text': 'Mfethu processing: "${_chatController.text}" (Placeholder response)', 'isUser': false});
-        _chatController.clear();
-      });
+    final text = _chatController.text.trim();
+    if (text.isNotEmpty) {
+      ref.read(mfethuChatProvider.notifier).addUserMessage(text);
+      _chatController.clear();
     }
   }
 
+  void _scrollToBottom() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients && _scrollController.position.hasContentDimensions) {
+           _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }
+      });
+  }
+
+
   @override
   Widget build(BuildContext context) {
+    final chatMessages = ref.watch(mfethuChatProvider);
+
+    // Listen for changes to scroll to bottom
+    ref.listen(mfethuChatProvider, (previous, next) {
+      if (next.length > (previous?.length ?? 0) ) {
+         _scrollToBottom();
+      }
+    });
+
+    // Initial scroll to bottom when messages are first loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (chatMessages.isNotEmpty) _scrollToBottom();
+    });
+
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI Dashboard (Mfethu & Khanyo)'),
       ),
       body: Column(
         children: [
-          // Khanyo Predictions Section - PRD 5.1, 7.1
+          // Khanyo Predictions Section (remains the same for now)
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text("Khanyo's Predictions", style: Theme.of(context).textTheme.headlineSmall),
           ),
           SizedBox(
-            height: 150, // Fixed height for horizontal list of predictions
+            height: 150,
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -123,22 +123,21 @@ class _AiDashboardScreenState extends State<AiDashboardScreen> {
             ),
           ),
           const Divider(),
-          // Mfethu Chat Interface Section - PRD 5.1, 7.1
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text("Mfethu Chat", style: Theme.of(context).textTheme.headlineSmall),
           ),
           Expanded(
             child: ListView.builder(
-              itemCount: _chatMessages.length,
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              itemCount: chatMessages.length,
               itemBuilder: (context, index) {
-                final message = _chatMessages[index];
-                return MfethuChatBubble(text: message['text'], isUser: message['isUser']);
+                final message = chatMessages[index];
+                return MfethuChatBubble(message: message);
               },
             ),
           ),
-          // Placeholder for Rive loading animation - PRD 7.2
-          // SizedBox(height: 50, child: RiveAnimation.asset('assets/loading.riv')) // If Rive asset is added
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -151,6 +150,7 @@ class _AiDashboardScreenState extends State<AiDashboardScreen> {
                       border: OutlineInputBorder(),
                     ),
                     onSubmitted: (_) => _sendMessage(),
+                    textInputAction: TextInputAction.send,
                   ),
                 ),
                 IconButton(
@@ -160,7 +160,6 @@ class _AiDashboardScreenState extends State<AiDashboardScreen> {
               ],
             ),
           ),
-          // Placeholder for SA Compliance: Responsible gambling hotline integration - PRD 6.1
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Text(
