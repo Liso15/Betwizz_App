@@ -69,6 +69,9 @@ dependencies:
   # For generating unique IDs (e.g., for chat messages)
   uuid: ^4.0.0 # Check pub.dev for latest version
 
+  # For WebSocket communication
+  web_socket_channel: ^2.4.0 # Check pub.dev for latest version
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

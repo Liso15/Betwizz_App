@@ -171,6 +171,13 @@ class _ChannelDashboardScreenState extends State<ChannelDashboardScreen> with Si
               Navigator.pushNamed(context, AppRoutes.videoPlayerDemo);
             },
           ),
+          IconButton( // Added WebSocket Demo Button
+            icon: const Icon(Icons.network_check),
+            tooltip: 'WebSocket Demo',
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.webSocketDemo);
+            },
+          ),
         ],
         bottom: TabBar(
           controller: _tabController,
