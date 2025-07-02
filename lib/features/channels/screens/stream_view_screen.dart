@@ -1,30 +1,116 @@
 import 'package:flutter/material.dart';
-// import 'package:agora_rtc_engine/agora_rtc_engine.dart'; // For AgoraVideoView later
-// import 'package:flutter_riverpod/flutter_riverpod.dart'; // For state management
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:betwizz_app/features/channels/services/agora_service.dart';
+import 'package:betwizz_app/core/config/agora_config.dart'; // For default channel name
+// import 'package:agora_rtc_engine/agora_rtc_engine.dart'; // For RtcEngine, VideoViewController, AgoraVideoView etc.
 
 // Placeholder for ZAR formatting utility - PRD 6.1
 String formatZAR(double amount) {
-  // In a real app, use intl package: NumberFormat.currency(locale: 'en_ZA', symbol: 'R').format(amount)
   return 'R ${amount.toStringAsFixed(2)}';
 }
 
-class StreamViewScreen extends ConsumerWidget { // Assuming Riverpod for state
+// Removed agoraServiceProvider from here, it will be in agora_service.dart
+
+class StreamViewScreen extends ConsumerStatefulWidget {
   const StreamViewScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<StreamViewScreen> createState() => _StreamViewScreenState();
+}
+
+class _StreamViewScreenState extends ConsumerState<StreamViewScreen> {
+  late AgoraService _agoraService;
+  String _statusMessage = "Initializing...";
+  bool _permissionsGranted = false;
+  // int? _localUid; // To store local user ID after joining channel
+  // Set<int> _remoteUids = {}; // To store remote user IDs
+
+  @override
+  void initState() {
+    super.initState();
+    _agoraService = ref.read(agoraServiceProvider);
+    _initAgora();
+  }
+
+  Future<void> _requestPermissions() async {
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.camera,
+      Permission.microphone,
+    ].request();
+
+    if (statuses[Permission.camera]!.isGranted && statuses[Permission.microphone]!.isGranted) {
+      setState(() {
+        _permissionsGranted = true;
+        _statusMessage = "Permissions granted. Initializing Agora...";
+      });
+    } else {
+      setState(() {
+        _permissionsGranted = false;
+        _statusMessage = "Permissions denied. Camera and Microphone are required for streaming.";
+      });
+      // Optionally, guide user to app settings
+      if (statuses[Permission.camera]!.isPermanentlyDenied || statuses[Permission.microphone]!.isPermanentlyDenied) {
+        // openAppSettings(); // Consider guiding user to settings
+         _statusMessage += "\nPlease enable them in app settings.";
+      }
+    }
+  }
+
+  Future<void> _initAgora() async {
+    await _requestPermissions();
+    if (!_permissionsGranted) return;
+
+    bool initialized = await _agoraService.initializeEngine();
+    if (initialized) {
+      setState(() {
+        _statusMessage = "Agora engine initialized. Joining channel...";
+      });
+      // Example: Join a default channel as a broadcaster
+      // In a real app, channelId, token, and uid would be dynamic
+      bool joined = await _agoraService.joinChannel(
+        channelId: AgoraConfig.defaultChannelName,
+        // token: AgoraConfig.temporaryToken, // Use actual token if required by your Agora project
+        // uid: AgoraConfig.defaultUid,
+        // clientRole: ClientRoleType.clientRoleBroadcaster, // Example role
+      );
+      if (joined && mounted) {
+         setState(() {
+          _statusMessage = "Attempted to join channel: ${AgoraConfig.defaultChannelName}. Waiting for connection...";
+          // Listen to agoraService events or use engine directly for local/remote UID updates
+          // For example, if AgoraService exposes a stream of UIDs or connection states.
+          // _localUid = _agoraService. // get current local UID if available after join attempt
+        });
+      } else if(mounted) {
+        setState(() {
+          _statusMessage = "Failed to join channel.";
+        });
+      }
+    } else if (mounted) {
+      setState(() {
+        _statusMessage = "Failed to initialize Agora engine. Check App ID.";
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _agoraService.disposeEngine(); // Ensure engine is released
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Placeholder data, would come from state/backend
     final currentStake = 100.50;
     final currentOdds = 2.5;
-    final viewerCount = 1234;
+    final viewerCount = 1234; // This would be dynamic
     final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
 
     return Scaffold(
-      // AppBar might be hidden in fullscreen landscape, but good for navigation
       appBar: AppBar(
         title: const Text('Live Stream'),
         actions: [
-          // Viewer Count Badge - PRD 3.1.2
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Chip(
@@ -36,20 +122,45 @@ class StreamViewScreen extends ConsumerWidget { // Assuming Riverpod for state
       ),
       body: Stack(
         children: [
-          // WebRTC video renderer (AgoraVideoView) - PRD 3.1.2 & 7.1
+          // Main video view area
           Container(
             color: Colors.black,
-            child: const Center(
-              child: Text(
-                'WebRTC Video Renderer (AgoraVideoView Placeholder)',
-                style: TextStyle(color: Colors.white),
-                textAlign: TextAlign.center,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(_statusMessage, style: const TextStyle(color: Colors.white)),
+                  const SizedBox(height: 10),
+                  // Placeholder for Local Video View
+                  // if (_agoraService.isInitialized && _agoraService.isInChannel && _localUid != null)
+                  //   Expanded(
+                  //     child: AgoraVideoView(
+                  //       controller: VideoViewController(
+                  //         rtcEngine: _agoraService.engine!,
+                  //         canvas: const VideoCanvas(uid: 0), // 0 for local view
+                  //       ),
+                  //     ),
+                  //   ),
+                  // Placeholder for Remote Video Views
+                  // ..._remoteUids.map((uid) => Expanded(
+                  //   child: AgoraVideoView(
+                  //     controller: VideoViewController.remote(
+                  //       rtcEngine: _agoraService.engine!,
+                  //       canvas: VideoCanvas(uid: uid),
+                  //       connection: RtcConnection(channelId: AgoraConfig.defaultChannelName),
+                  //     ),
+                  //   ),
+                  // )).toList(),
+                  if (!_permissionsGranted)
+                    ElevatedButton(
+                        onPressed: _requestPermissions,
+                        child: const Text("Request Permissions"))
+                ],
               ),
             ),
           ),
 
-          // Bet Overlay Display (current stake, odds) - PRD 2.1
-          // This could be a more complex widget, perhaps positioned based on orientation
+          // --- Other UI elements from previous version ---
           Positioned(
             top: isPortrait ? 80 : 20,
             left: 20,
@@ -67,10 +178,6 @@ class StreamViewScreen extends ConsumerWidget { // Assuming Riverpod for state
               ),
             ),
           ),
-
-          // Viewer engagement heatmap (Placeholder) - PRD 2.1
-          // This would likely be an overlay that processes tap data or chat sentiment
-          // For now, just a conceptual placeholder
           Positioned(
             bottom: isPortrait ? 150 : 80,
             right: 20,
@@ -87,9 +194,6 @@ class StreamViewScreen extends ConsumerWidget { // Assuming Riverpod for state
               ),
             ),
           ),
-
-          // Real-time bet slip (floating widget) - PRD 3.1.2
-          // This could be draggable or expandable.
           Positioned(
             bottom: isPortrait ? 80 : 20,
             left: 20,
@@ -103,9 +207,9 @@ class StreamViewScreen extends ConsumerWidget { // Assuming Riverpod for state
                   children: [
                     const Text('Real-time Bet Slip', style: TextStyle(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    const Text('Selected Bet: Team A to Win'), // Placeholder
+                    const Text('Selected Bet: Team A to Win'),
                     const SizedBox(height: 4),
-                    Text('Stake: ${formatZAR(50.00)}'), // Placeholder
+                    Text('Stake: ${formatZAR(50.00)}'),
                     const SizedBox(height: 8),
                     ElevatedButton(onPressed: () {}, child: const Text('Place Bet'))
                   ],
@@ -113,16 +217,13 @@ class StreamViewScreen extends ConsumerWidget { // Assuming Riverpod for state
               ),
             ),
           ),
-
-          // ZAR donation button - PRD 3.1.2
           Positioned(
             top: isPortrait ? 80 : 20,
             right: 20,
             child: ElevatedButton.icon(
               icon: const Icon(Icons.monetization_on),
-              label: Text('Donate ${formatZAR(10)}'), // Example amount
+              label: Text('Donate ${formatZAR(10)}'),
               onPressed: () {
-                // TODO: Implement donation flow (e.g. PayFast)
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Donation (Not Implemented)')),
                 );
@@ -130,15 +231,12 @@ class StreamViewScreen extends ConsumerWidget { // Assuming Riverpod for state
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             ),
           ),
-
-          // Live chat (Placeholder) - PRD 7.1 (Stream View)
-          // Usually at the bottom or side
           Positioned(
             bottom: 10,
             left: isPortrait ? 10 : null,
             right: 10,
-            width: isPortrait ? null : 250, // Side panel in landscape
-            height: isPortrait ? 120 : null, // Bottom bar in portrait
+            width: isPortrait ? null : 250,
+            height: isPortrait ? 120 : null,
             child: Opacity(
               opacity: 0.8,
               child: Card(
@@ -157,20 +255,8 @@ class StreamViewScreen extends ConsumerWidget { // Assuming Riverpod for state
           )
         ],
       ),
-      // TODO: Add support for Portrait/Landscape mode adjustments (PRD 2.1)
-      // This is partially handled by checking MediaQuery.of(context).orientation
-      // but more sophisticated layouts might be needed.
     );
   }
 }
 
-// Need to make it a ConsumerWidget for Riverpod if not already.
-// For now, keeping it StatelessWidget if Riverpod is not strictly needed for placeholders.
-// Changed to ConsumerWidget as per plan.
-
-// Placeholder for WidgetRef if not using ConsumerWidget directly
-class WidgetRef {
-  // Placeholder for Riverpod's WidgetRef. Actual methods/properties depend on Riverpod usage.
-  // T watch<T>(ProviderListenable<T> provider) { throw UnimplementedError(); }
-  // T read<T>(ProviderListenable<T> provider) { throw UnimplementedError(); }
-}
+// Removed redundant WidgetRef placeholder
