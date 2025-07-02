@@ -3,8 +3,10 @@ import 'package:camera/camera.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:betwizz_app/features/receipt_processing/services/ocr_service.dart';
+import 'package:betwizz_app/features/receipt_processing/services/bet_slip_parser_service.dart'; // Import Parser Service
+import 'package:betwizz_app/features/receipt_processing/models/bet_slip_data_model.dart'; // Import Data Model
 
-class ReceiptScanScreen extends ConsumerStatefulWidget { // Changed to ConsumerStatefulWidget
+class ReceiptScanScreen extends ConsumerStatefulWidget {
   const ReceiptScanScreen({super.key});
 
   @override
@@ -19,7 +21,7 @@ class _ReceiptScanScreenState extends ConsumerState<ReceiptScanScreen> {
   bool _isProcessingOcr = false;
   String _ocrResult = "Align receipt and tap scan button.";
   String _statusMessage = "Initializing camera...";
-
+  BetSlipData? _parsedBetData; // State variable for parsed data
 
   @override
   void initState() {
@@ -110,6 +112,19 @@ class _ReceiptScanScreenState extends ConsumerState<ReceiptScanScreen> {
       if (!mounted) return;
       setState(() {
         _ocrResult = extractedText.isEmpty ? "No text found in the image." : extractedText;
+        // Attempt to parse the extracted text
+        if (extractedText.isNotEmpty) {
+          final parserService = ref.read(betSlipParserServiceProvider);
+          _parsedBetData = parserService.parseBetwayText(extractedText);
+          if (_parsedBetData != null && !_parsedBetData!.isEmpty) {
+            debugPrint("Parsed Bet Data: ${_parsedBetData.toString()}");
+            // Optionally update _ocrResult or a different state variable to show parsed data
+          } else {
+            debugPrint("Failed to parse bet slip data or parsed data is empty.");
+          }
+        } else {
+          _parsedBetData = null; // Clear previous parsed data if no text found
+        }
       });
 
     } catch (e) {
@@ -245,7 +260,28 @@ class _ReceiptScanScreenState extends ConsumerState<ReceiptScanScreen> {
                    // PRD 5.1: Betway OCR Parser, Hollywood Bets Integration
                   Expanded(
                     child: SingleChildScrollView(
-                      child: Text(_ocrResult, style: const TextStyle(fontSize: 12)),
+                      padding: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Raw OCR Text:", style: Theme.of(context).textTheme.titleSmall),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.all(8.0),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(4.0),
+                            ),
+                            child: Text(_ocrResult, style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+                          ),
+                          const SizedBox(height: 16),
+                          Text("Parsed Bet Slip Data (Example):", style: Theme.of(context).textTheme.titleSmall),
+                          const SizedBox(height: 4),
+                          _parsedBetData != null && !_parsedBetData!.isEmpty
+                            ? _buildParsedDataView(_parsedBetData!)
+                            : const Text("No structured data parsed, or parser not effective for this text.", style: TextStyle(fontStyle: FontStyle.italic)),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -273,5 +309,33 @@ class _ReceiptScanScreenState extends ConsumerState<ReceiptScanScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildParsedDataView(BetSlipData data) {
+    final items = <Widget>[
+      if (data.bookmaker != null) ListTile(title: const Text("Bookmaker"), subtitle: Text(data.bookmaker!)),
+      if (data.stake != null) ListTile(title: const Text("Stake"), subtitle: Text("R ${data.stake!.toStringAsFixed(2)}")),
+      if (data.totalOdds != null) ListTile(title: const Text("Total Odds"), subtitle: Text(data.totalOdds!.toStringAsFixed(2))),
+      if (data.potentialWinnings != null) ListTile(title: const Text("Potential Winnings"), subtitle: Text("R ${data.potentialWinnings!.toStringAsFixed(2)}")),
+      if (data.betType != null) ListTile(title: const Text("Bet Type"), subtitle: Text(data.betType!)),
+      if (data.transactionId != null) ListTile(title: const Text("Transaction ID"), subtitle: Text(data.transactionId!)),
+      if (data.betDateTime != null) ListTile(title: const Text("Date/Time"), subtitle: Text(data.betDateTime.toString())),
+      if (data.selections.isNotEmpty) ...[
+        const ListTile(title: Text("Selections"), dense: true),
+        Padding(
+          padding: const EdgeInsets.only(left: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: data.selections.map((s) => Text("- $s", style: const TextStyle(fontSize: 12))).toList(),
+          ),
+        ),
+      ]
+    ];
+
+    if (items.isEmpty) {
+      return const Text("No specific fields could be parsed by the example parser.", style: TextStyle(fontStyle: FontStyle.italic));
+    }
+
+    return Column(children: items);
   }
 }
