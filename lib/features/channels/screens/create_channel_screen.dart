@@ -1,45 +1,36 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:betwizz_app/features/channels/notifiers/create_channel_form_notifier.dart';
+import 'package:betwizz_app/features/channels/models/create_channel_form_state.dart';
 
-class CreateChannelScreen extends StatefulWidget {
+class CreateChannelScreen extends ConsumerWidget { // Changed to ConsumerWidget
   const CreateChannelScreen({super.key});
 
-  @override
-  State<CreateChannelScreen> createState() => _CreateChannelScreenState();
-}
-
-class _CreateChannelScreenState extends State<CreateChannelScreen> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _descriptionController;
+  // Note: FormKey is not strictly necessary if all validation is handled by the notifier,
+  // but can be kept if you prefer using TextFormField's validator prop directly for UI feedback
+  // before even hitting the notifier. For this example, we'll rely on notifier's error message.
+  // final _formKey = GlobalKey<FormState>();
 
   @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController();
-    _descriptionController = TextEditingController();
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final formState = ref.watch(createChannelFormProvider);
+    final formNotifier = ref.read(createChannelFormProvider.notifier);
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
+    // Listen for submission success to show SnackBar and pop
+    ref.listen<CreateChannelFormState>(createChannelFormProvider, (previous, next) {
+      if (next.submissionSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Channel creation submitted (Mock)!')),
+        );
+        // Reset the success flag so it doesn't trigger again on rebuild
+        formNotifier.consumeSubmissionSuccess();
+        // Optionally navigate back or to a different screen
+        if (Navigator.canPop(context)) {
+          Navigator.of(context).pop();
+        }
+      }
+    });
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      // Placeholder action for now
-      final channelName = _nameController.text;
-      final channelDescription = _descriptionController.text;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Channel "$channelName" creation requested (Placeholder). Desc: "$channelDescription"')),
-      );
-      Navigator.of(context).pop();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create New Channel'),
@@ -50,58 +41,54 @@ class _CreateChannelScreenState extends State<CreateChannelScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
+        // child: Form( // Form widget is optional if not using its validation
+          // key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               TextFormField(
-                controller: _nameController,
+                initialValue: formState.channelName, // Set initialValue
                 decoration: const InputDecoration(
                   labelText: 'Channel Name',
                   hintText: 'Enter a unique name for your channel',
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a channel name';
-                  }
-                  if (value.length < 3) {
-                    return 'Channel name must be at least 3 characters';
-                  }
-                  return null;
-                },
+                onChanged: (value) => formNotifier.updateChannelName(value),
+                // validator: ... // Could still use local validation if desired
               ),
               const SizedBox(height: 16.0),
               TextFormField(
-                controller: _descriptionController,
+                initialValue: formState.description, // Set initialValue
                 decoration: const InputDecoration(
                   labelText: 'Channel Description',
                   hintText: 'Tell viewers what your channel is about',
                   border: OutlineInputBorder(),
                 ),
-                maxLines: 3, // Allow for a multi-line description
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a channel description';
-                  }
-                   if (value.length < 10) {
-                    return 'Description must be at least 10 characters';
-                  }
-                  return null;
-                },
+                maxLines: 3,
+                onChanged: (value) => formNotifier.updateDescription(value),
               ),
-              const SizedBox(height: 24.0),
-              ElevatedButton(
-                onPressed: _submitForm,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+              const SizedBox(height: 16.0),
+              if (formState.errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10.0),
+                  child: Text(
+                    formState.errorMessage!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
                 ),
-                child: const Text('Create Channel'),
-              ),
+              const SizedBox(height: 8.0),
+              formState.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ElevatedButton(
+                      onPressed: () => formNotifier.submitCreateChannelForm(),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      ),
+                      child: const Text('Create Channel'),
+                    ),
             ],
           ),
-        ),
+        // ),
       ),
     );
   }
