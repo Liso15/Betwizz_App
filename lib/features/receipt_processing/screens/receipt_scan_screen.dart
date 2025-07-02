@@ -1,63 +1,136 @@
 import 'package:flutter/material.dart';
-// import 'package:camera/camera.dart'; // For CameraPreview
-// import 'package:firebase_ml_vision/firebase_ml_vision.dart'; // For OCR
+import 'package:camera/camera.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:betwizz_app/features/receipt_processing/services/ocr_service.dart';
 
-class ReceiptScanScreen extends StatefulWidget {
+class ReceiptScanScreen extends ConsumerStatefulWidget { // Changed to ConsumerStatefulWidget
   const ReceiptScanScreen({super.key});
 
   @override
-  State<ReceiptScanScreen> createState() => _ReceiptScanScreenState();
+  ConsumerState<ReceiptScanScreen> createState() => _ReceiptScanScreenState();
 }
 
-class _ReceiptScanScreenState extends State<ReceiptScanScreen> {
-  // CameraController? _cameraController; // To be initialized
-  bool _isCameraInitialized = false; // Placeholder
-  String _ocrResult = "Scan a receipt to see OCR results here.";
+class _ReceiptScanScreenState extends ConsumerState<ReceiptScanScreen> {
+  CameraController? _cameraController;
+  List<CameraDescription>? _cameras;
+  bool _isCameraPermissionGranted = false;
+  bool _isCameraInitialized = false;
+  bool _isProcessingOcr = false;
+  String _ocrResult = "Align receipt and tap scan button.";
+  String _statusMessage = "Initializing camera...";
 
-  // Placeholder for camera initialization
-  Future<void> _initializeCamera() async {
-    // TODO: Implement camera initialization using 'camera' package
-    // final cameras = await availableCameras();
-    // final firstCamera = cameras.first;
-    // _cameraController = CameraController(firstCamera, ResolutionPreset.high);
-    // await _cameraController.initialize();
-    await Future.delayed(const Duration(seconds: 1)); // Simulate init
-    if (!mounted) return;
-    setState(() {
-      _isCameraInitialized = true;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Camera Initialized (Placeholder)')),
-    );
-  }
-
-  // Placeholder for OCR processing
-  Future<void> _processImageForOCR() async {
-    // TODO: Capture image using _cameraController and process with Firebase ML Vision
-    // final image = await _cameraController.takePicture();
-    // final FirebaseVisionImage visionImage = FirebaseVisionImage.fromFilePath(image.path);
-    // final TextRecognizer textRecognizer = FirebaseVision.instance.textRecognizer();
-    // final VisionText visionText = await textRecognizer.processImage(visionImage);
-    // setState(() { _ocrResult = visionText.text ?? "No text found."; });
-    // await textRecognizer.close();
-    await Future.delayed(const Duration(seconds: 1)); // Simulate processing
-    setState(() {
-      _ocrResult = "Betway OCR Parser Result (Placeholder):\nMatch: Team A vs Team B\nBet: Team A Win\nStake: R50.00";
-    });
-     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('OCR Processed (Placeholder)')),
-    );
-  }
 
   @override
   void initState() {
     super.initState();
-    _initializeCamera(); // Attempt to initialize camera on screen load
+    _requestCameraPermissionAndInitialize();
   }
+
+  Future<void> _requestCameraPermissionAndInitialize() async {
+    final status = await Permission.camera.request();
+    if (status.isGranted) {
+      setState(() {
+        _isCameraPermissionGranted = true;
+        _statusMessage = "Camera permission granted. Initializing camera...";
+      });
+      await _initializeCameraController();
+    } else {
+      setState(() {
+        _isCameraPermissionGranted = false;
+        _statusMessage = "Camera permission denied. OCR functionality requires camera access.";
+         if (status.isPermanentlyDenied) {
+           _statusMessage += "\nPlease enable camera access in app settings.";
+         }
+      });
+    }
+  }
+
+  Future<void> _initializeCameraController() async {
+    if (!_isCameraPermissionGranted) return;
+
+    _cameras = await availableCameras();
+    if (_cameras == null || _cameras!.isEmpty) {
+      setState(() {
+        _statusMessage = "No cameras available on this device.";
+        _isCameraInitialized = false;
+      });
+      return;
+    }
+
+    // Initialize with the first back camera found
+    CameraDescription? backCamera = _cameras!.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+        orElse: () => _cameras!.first, // Fallback to first camera if no back camera
+    );
+
+    _cameraController = CameraController(
+      backCamera,
+      ResolutionPreset.high, // Use high resolution for better OCR
+      enableAudio: false, // Audio is not needed for OCR
+    );
+
+    try {
+      await _cameraController!.initialize();
+      if (!mounted) return;
+      setState(() {
+        _isCameraInitialized = true;
+        _statusMessage = "Camera ready. Align receipt and scan.";
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _statusMessage = "Error initializing camera: ${e.toString()}";
+        _isCameraInitialized = false;
+      });
+      debugPrint("Camera initialization error: $e");
+    }
+  }
+
+  Future<void> _captureAndProcessImage() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized || _isProcessingOcr) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Camera not ready or already processing.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isProcessingOcr = true;
+      _ocrResult = "Processing image...";
+    });
+
+    try {
+      final XFile imageFile = await _cameraController!.takePicture();
+      debugPrint("Image captured: ${imageFile.path}");
+
+      final ocrService = ref.read(ocrServiceProvider);
+      final extractedText = await ocrService.extractTextFromImage(imageFile.path);
+
+      if (!mounted) return;
+      setState(() {
+        _ocrResult = extractedText.isEmpty ? "No text found in the image." : extractedText;
+      });
+
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _ocrResult = "Error processing image: ${e.toString()}";
+      });
+      debugPrint("OCR processing error: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingOcr = false;
+        });
+      }
+    }
+  }
+
 
   @override
   void dispose() {
-    // _cameraController?.dispose(); // Dispose camera controller
+    _cameraController?.dispose();
     super.dispose();
   }
 
@@ -130,13 +203,32 @@ class _ReceiptScanScreenState extends State<ReceiptScanScreen> {
           // OCR Viewfinder (CameraPreview) - PRD 7.1
           Expanded(
             flex: 3,
-            child: Container(
-              color: Colors.black,
-              child: _isCameraInitialized
-                  // ? CameraPreview(_cameraController!) // Uncomment when camera is implemented
-                  ? const Center(child: Text('CameraPreview Placeholder', style: TextStyle(color: Colors.white)))
-                  : const Center(child: CircularProgressIndicator()),
-            ),
+            child: _isCameraPermissionGranted
+                ? _isCameraInitialized && _cameraController != null
+                    ? CameraPreview(_cameraController!)
+                    : Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 10),
+                            Text(_statusMessage, style: const TextStyle(color: Colors.white)),
+                          ],
+                        ),
+                      )
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                           Text(_statusMessage, textAlign: TextAlign.center, style: const TextStyle(color: Colors.redAccent)),
+                           const SizedBox(height: 10),
+                           ElevatedButton(onPressed: _requestCameraPermissionAndInitialize, child: const Text("Retry Permissions"))
+                        ],
+                      ),
+                    ),
+                  ),
           ),
           // OCR Results / Controls Area
           Expanded(
@@ -151,12 +243,19 @@ class _ReceiptScanScreenState extends State<ReceiptScanScreen> {
                     textAlign: TextAlign.center,
                   ),
                    // PRD 5.1: Betway OCR Parser, Hollywood Bets Integration
-                  Text('OCR Result: $_ocrResult', style: const TextStyle(fontSize: 12)),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Scan / Re-scan Receipt'),
-                    onPressed: _isCameraInitialized ? _processImageForOCR : null,
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Text(_ocrResult, style: const TextStyle(fontSize: 12)),
+                    ),
                   ),
+                  const SizedBox(height: 10),
+                  _isProcessingOcr
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton.icon(
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text('Scan / Re-scan Receipt'),
+                      onPressed: (_isCameraInitialized && _isCameraPermissionGranted) ? _captureAndProcessImage : null,
+                    ),
                   // Placeholder for SA Compliance: Loss limit enforcement widgets
                   // This might appear if a scanned bet exceeds limits.
                   const Padding(

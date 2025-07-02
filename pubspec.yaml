@@ -16,7 +16,8 @@ dependencies:
   # Dependencies from PRD 5.2
   payfast_flutter: ^1.5.0
   agora_rtc_engine: ^6.0.0
-  firebase_ml_vision: ^4.0.0 # Note: firebase_ml_vision is deprecated, consider google_ml_kit
+  # firebase_ml_vision: ^4.0.0 # Removed, deprecated
+  google_ml_kit_text_recognition: ^0.11.0 # For OCR
   flutter_secure_storage: ^8.0.0
   riverpod: ^2.0.0 # Assuming flutter_riverpod for Flutter specific bindings
   flutter_riverpod: ^2.4.0 # Adding flutter_riverpod explicitly
