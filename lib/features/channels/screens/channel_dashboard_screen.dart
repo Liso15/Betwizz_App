@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:betwizz_app/features/channels/models/strategy_model.dart';
 import 'package:betwizz_app/features/channels/notifiers/strategy_providers.dart';
-import 'package:betwizz_app/features/channels/repositories/channel_repository.dart'; // Import ChannelRepository provider
-import 'package:intl/intl.dart'; // For date formatting
+import 'package:betwizz_app/features/channels/repositories/channel_repository.dart';
+import 'package:betwizz_app/features/channels/widgets/community_chat_view.dart'; // Import CommunityChatView
+import 'package:intl/intl.dart';
 
 // Placeholder for Creator data model, replace with actual model later
 class Creator {
@@ -177,10 +178,12 @@ class _ChannelDashboardScreenState extends State<ChannelDashboardScreen> with Si
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: const [
-                Center(child: Text('Live Stream Tab Content')),
-                StrategyVaultView(), // Use the new ConsumerWidget here
-                Center(child: Text('Community Chat Tab Content')),
+              children: [
+                const Center(child: Text('Live Stream Tab Content')),
+                const StrategyVaultView(),
+                // Provide a placeholder channelId for now.
+                // In a real app, this would come from the current channel context.
+                CommunityChatView(channelId: _creator.name.replaceAll(' ', '_').toLowerCase() + "_channel"),
               ],
             ),
           ),

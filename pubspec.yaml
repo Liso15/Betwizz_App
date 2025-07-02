@@ -65,6 +65,9 @@ dependencies:
   # For handling runtime permissions (e.g., camera, microphone for Agora)
   permission_handler: ^11.0.0 # Check pub.dev for latest version
 
+  # For generating unique IDs (e.g., for chat messages)
+  uuid: ^4.0.0 # Check pub.dev for latest version
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
