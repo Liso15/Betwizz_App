@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:betwizz_app/features/channels/models/strategy_model.dart';
 import 'package:betwizz_app/features/channels/notifiers/strategy_providers.dart';
+import 'package:betwizz_app/features/channels/repositories/channel_repository.dart'; // Import ChannelRepository provider
 import 'package:intl/intl.dart'; // For date formatting
 
 // Placeholder for Creator data model, replace with actual model later
@@ -73,7 +74,7 @@ class StrategyVaultView extends ConsumerWidget {
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(strategy.description),
+                    Text(strategy.description, maxLines: 2, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
                     Text(
                       'By: ${strategy.authorName} - ${DateFormat.yMMMd().format(strategy.createdAt)}',
@@ -81,7 +82,32 @@ class StrategyVaultView extends ConsumerWidget {
                     ),
                   ],
                 ),
-                // isThreeLine: true, // If description is long
+                trailing: IconButton(
+                  icon: const Icon(Icons.enhanced_encryption_outlined),
+                  tooltip: 'Encrypt (Stub)',
+                  onPressed: () async {
+                    // Hardcoded user key for demonstration
+                    const String userKey = "averysecureplaceholderkey1234567";
+
+                    // Show loading indicator SnackBar
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Encrypting strategy...'), duration: Duration(seconds: 1)),
+                    );
+
+                    try {
+                      final result = await ref.read(channelRepositoryProvider).uploadEncryptedStrategy(strategy, userKey);
+                      ScaffoldMessenger.of(context).removeCurrentSnackBar(); // Remove loading SnackBar
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(result), duration: const Duration(seconds: 3)),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error during encryption: $e'), duration: const Duration(seconds: 3)),
+                      );
+                    }
+                  },
+                ),
                 onTap: () {
                   // TODO: Implement navigation to strategy detail screen or action
                   ScaffoldMessenger.of(context).showSnackBar(
